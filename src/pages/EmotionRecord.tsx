@@ -3,6 +3,9 @@ import { Heart, Smile, Frown, Meh, Angry, Zap, Coffee, Music, Book, Users, Home,
 import { toast } from 'sonner';
 import { useAuthStore } from '../stores/authStore';
 import { emotionApi, CreateEmotionRequest } from '../services/api';
+import { useErrorHandler } from '../hooks/useErrorHandler';
+import { useFormLoading } from '../hooks/useLoading';
+import { LoadingSpinner } from '../components/Loading';
 
 interface EmotionData {
   mood: string;
@@ -13,13 +16,15 @@ interface EmotionData {
 
 const EmotionRecord: React.FC = () => {
   const { user } = useAuthStore();
+  const { handleError, handleFormError } = useErrorHandler();
+  const { isFormLoading, setFormLoading } = useFormLoading('emotion-record');
+
   const [emotionData, setEmotionData] = useState<EmotionData>({
     mood: '',
     intensity: 5,
     activities: [],
     description: ''
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 心情选项
   const moodOptions = [
@@ -64,18 +69,26 @@ const EmotionRecord: React.FC = () => {
     setEmotionData(prev => ({ ...prev, description }));
   };
 
-  const handleSubmit = async () => {
+  const validateForm = (): boolean => {
     if (!emotionData.mood) {
       toast.error('请选择您的心情');
-      return;
+      return false;
     }
 
     if (!user) {
       toast.error('请先登录');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
       return;
     }
 
-    setIsSubmitting(true);
+    setFormLoading(true);
 
     try {
       const requestData: CreateEmotionRequest = {
@@ -97,13 +110,12 @@ const EmotionRecord: React.FC = () => {
           description: ''
         });
       } else {
-        toast.error(response.message || response.error || '保存失败，请重试');
+        handleFormError(new Error(response.message || response.error || '保存失败'));
       }
     } catch (error) {
-      console.error('保存情绪记录失败:', error);
-      toast.error('网络错误，请检查连接');
+      handleFormError(error as Error);
     } finally {
-      setIsSubmitting(false);
+      setFormLoading(false);
     }
   };
 
@@ -124,18 +136,18 @@ const EmotionRecord: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-2 sm:p-4">
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">记录此刻心情</h1>
-            <p className="text-gray-600">分享您的感受，让我们一起关注您的情绪健康</p>
+        <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8">
+          <div className="text-center mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">记录此刻心情</h1>
+            <p className="text-gray-600 text-sm sm:text-base px-2">分享您的感受，让我们一起关注您的情绪健康</p>
           </div>
 
           {/* 心情选择器 */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">您现在的心情如何？</h2>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">您现在的心情如何？</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
               {moodOptions.map((option) => {
                 const IconComponent = option.icon;
                 const isSelected = emotionData.mood === option.value;
@@ -143,14 +155,13 @@ const EmotionRecord: React.FC = () => {
                   <button
                     key={option.value}
                     onClick={() => handleMoodSelect(option.value)}
-                    className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                      isSelected
-                        ? 'border-purple-500 bg-purple-50 shadow-md'
-                        : `border-gray-200 ${option.bgColor}`
-                    }`}
+                    className={`p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 active:scale-95 ${isSelected
+                      ? 'border-purple-500 bg-purple-50 shadow-md'
+                      : `border-gray-200 ${option.bgColor}`
+                      }`}
                   >
-                    <IconComponent className={`w-8 h-8 mx-auto mb-2 ${option.color}`} />
-                    <p className="text-sm font-medium text-gray-700">{option.label}</p>
+                    <IconComponent className={`w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-1 sm:mb-2 ${option.color}`} />
+                    <p className="text-xs sm:text-sm font-medium text-gray-700">{option.label}</p>
                   </button>
                 );
               })}
@@ -158,15 +169,15 @@ const EmotionRecord: React.FC = () => {
           </div>
 
           {/* 情绪强度 */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">情绪强度</h2>
-            <div className="bg-gray-50 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-600">很低</span>
-                <span className={`text-lg font-bold ${getIntensityColor(emotionData.intensity)}`}>
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">情绪强度</h2>
+            <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <span className="text-xs sm:text-sm text-gray-600">很低</span>
+                <span className={`text-base sm:text-lg font-bold ${getIntensityColor(emotionData.intensity)}`}>
                   {emotionData.intensity} - {getIntensityLabel(emotionData.intensity)}
                 </span>
-                <span className="text-sm text-gray-600">很高</span>
+                <span className="text-xs sm:text-sm text-gray-600">很高</span>
               </div>
               <input
                 type="range"
@@ -185,9 +196,9 @@ const EmotionRecord: React.FC = () => {
           </div>
 
           {/* 活动标签 */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">您在做什么？</h2>
-            <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">您在做什么？</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
               {activityOptions.map((activity) => {
                 const IconComponent = activity.icon;
                 const isSelected = emotionData.activities.includes(activity.value);
@@ -195,14 +206,13 @@ const EmotionRecord: React.FC = () => {
                   <button
                     key={activity.value}
                     onClick={() => handleActivityToggle(activity.value)}
-                    className={`p-3 rounded-lg border transition-all duration-200 ${
-                      isSelected
-                        ? 'border-purple-500 bg-purple-100 text-purple-700'
-                        : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'
-                    }`}
+                    className={`p-2 sm:p-3 rounded-lg border transition-all duration-200 active:scale-95 ${isSelected
+                      ? 'border-purple-500 bg-purple-100 text-purple-700'
+                      : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'
+                      }`}
                   >
-                    <IconComponent className="w-5 h-5 mx-auto mb-1" />
-                    <p className="text-xs font-medium">{activity.label}</p>
+                    <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1" />
+                    <p className="text-xs font-medium text-center">{activity.label}</p>
                   </button>
                 );
               })}
@@ -210,24 +220,28 @@ const EmotionRecord: React.FC = () => {
           </div>
 
           {/* 日记描述 */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">想要分享更多吗？</h2>
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">想要分享更多吗？</h2>
             <textarea
               value={emotionData.description}
               onChange={(e) => handleDescriptionChange(e.target.value)}
               placeholder="记录下您的想法、感受或今天发生的事情..."
-              className="w-full h-32 p-4 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full h-24 sm:h-32 p-3 sm:p-4 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
             />
           </div>
 
           {/* 提交按钮 */}
-          <div className="text-center">
+          <div className="text-center pt-2">
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting || !emotionData.mood}
-              className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              disabled={isFormLoading || !emotionData.mood}
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl active:scale-95 sm:transform sm:hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none min-w-[120px] flex items-center justify-center"
             >
-              {isSubmitting ? '保存中...' : '保存记录'}
+              {isFormLoading ? (
+                <LoadingSpinner size="sm" text="保存中..." />
+              ) : (
+                '保存记录'
+              )}
             </button>
           </div>
         </div>

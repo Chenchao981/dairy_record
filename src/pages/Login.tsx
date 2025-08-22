@@ -3,11 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Heart, User, Phone } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { LoginRequest } from '../services/api';
+import { useErrorHandler } from '../hooks/useErrorHandler';
+import { useFormLoading } from '../hooks/useLoading';
+import { LoadingSpinner } from '../components/Loading';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
-  
+  const { handleFormError } = useErrorHandler();
+  const { isFormLoading, setFormLoading } = useFormLoading('login');
+
   const [formData, setFormData] = useState<LoginRequest>({
     loginType: 'account',
     loginValue: '',
@@ -15,7 +20,7 @@ const Login: React.FC = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Partial<LoginRequest>>({});
-  
+
   // 登录方式选项
   const loginTypes = [
     { value: 'account' as const, label: '账号', icon: User, placeholder: '请输入账号' },
@@ -78,7 +83,7 @@ const Login: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     // 清除对应字段的验证错误
     if (validationErrors[name as keyof LoginRequest]) {
       setValidationErrors(prev => ({ ...prev, [name]: undefined }));
@@ -88,14 +93,21 @@ const Login: React.FC = () => {
   // 处理表单提交
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
-    const success = await login(formData);
-    if (success) {
-      navigate('/');
+    try {
+      setFormLoading(true);
+      const success = await login(formData);
+      if (success) {
+        navigate('/');
+      }
+    } catch (error) {
+      handleFormError(error as Error);
+    } finally {
+      setFormLoading(false);
     }
   };
 
@@ -132,11 +144,10 @@ const Login: React.FC = () => {
                     key={type.value}
                     type="button"
                     onClick={() => setFormData(prev => ({ ...prev, loginType: type.value, loginValue: '' }))}
-                    className={`flex-1 flex items-center justify-center py-2 px-3 rounded-md text-sm font-medium transition-all ${
-                      formData.loginType === type.value
-                        ? 'bg-white text-purple-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
+                    className={`flex-1 flex items-center justify-center py-2 px-3 rounded-md text-sm font-medium transition-all ${formData.loginType === type.value
+                      ? 'bg-white text-purple-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                      }`}
                     disabled={isLoading}
                   >
                     <type.icon className="w-4 h-4 mr-1" />
@@ -163,11 +174,10 @@ const Login: React.FC = () => {
                   type={formData.loginType === 'email' ? 'email' : 'text'}
                   value={formData.loginValue}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
-                    validationErrors.loginValue
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300 bg-white/50'
-                  }`}
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${validationErrors.loginValue
+                    ? 'border-red-300 bg-red-50'
+                    : 'border-gray-300 bg-white/50'
+                    }`}
                   placeholder={loginTypes.find(t => t.value === formData.loginType)?.placeholder}
                   disabled={isLoading}
                 />
@@ -179,9 +189,17 @@ const Login: React.FC = () => {
 
             {/* 密码输入 */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                密码
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  密码
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-purple-600 hover:text-purple-800 transition-colors"
+                >
+                  忘记密码？
+                </Link>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-gray-400" />
@@ -192,11 +210,10 @@ const Login: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
-                    validationErrors.password
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300 bg-white/50'
-                  }`}
+                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${validationErrors.password
+                    ? 'border-red-300 bg-red-50'
+                    : 'border-gray-300 bg-white/50'
+                    }`}
                   placeholder="请输入您的密码"
                   disabled={isLoading}
                 />
@@ -221,14 +238,11 @@ const Login: React.FC = () => {
             {/* 登录按钮 */}
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-3 px-4 rounded-lg font-medium hover:from-purple-600 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]"
+              disabled={isLoading || isFormLoading}
+              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-3 px-4 rounded-lg font-medium hover:from-purple-600 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] min-h-[48px] flex items-center justify-center"
             >
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  登录中...
-                </div>
+              {(isLoading || isFormLoading) ? (
+                <LoadingSpinner size="sm" text="登录中..." />
               ) : (
                 '登录'
               )}

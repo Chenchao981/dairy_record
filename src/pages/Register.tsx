@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Heart } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Heart, CheckCircle, Send } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { RegisterRequest } from '../services/api';
+import { useErrorHandler } from '../hooks/useErrorHandler';
+import { useFormLoading } from '../hooks/useLoading';
+import { LoadingSpinner } from '../components/Loading';
+import { toast } from 'sonner';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { register, isLoading, error, clearError, isAuthenticated } = useAuthStore();
-  
+  const { handleFormError } = useErrorHandler();
+  const { isFormLoading, setFormLoading } = useFormLoading('register');
+
   const [formData, setFormData] = useState<RegisterRequest>({
     email: '',
     password: '',
@@ -16,6 +22,8 @@ const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isRegistrationSuccess, setIsRegistrationSuccess] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const [validationErrors, setValidationErrors] = useState<Partial<RegisterRequest & { confirmPassword: string }>>({});
 
   // 如果已登录，重定向到首页
@@ -71,13 +79,13 @@ const Register: React.FC = () => {
   // 处理输入变化
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
+
     if (name === 'confirmPassword') {
       setConfirmPassword(value);
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
-    
+
     // 清除对应字段的验证错误
     if (validationErrors[name as keyof (RegisterRequest & { confirmPassword: string })]) {
       setValidationErrors(prev => ({ ...prev, [name]: undefined }));
@@ -87,16 +95,108 @@ const Register: React.FC = () => {
   // 处理表单提交
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
-    const success = await register(formData);
-    if (success) {
-      navigate('/');
+    try {
+      setFormLoading(true);
+      const success = await register(formData);
+      if (success) {
+        // 注册成功后显示邮箱验证提示
+        setRegisteredEmail(formData.email);
+        setIsRegistrationSuccess(true);
+        toast.success('注册成功！请查收验证邮件');
+      }
+    } catch (error) {
+      handleFormError(error as Error);
+    } finally {
+      setFormLoading(false);
     }
   };
+
+  // 重新发送验证邮件
+  const handleResendEmail = async () => {
+    try {
+      setFormLoading(true);
+
+      // TODO: 实现重新发送验证邮件API
+      // const response = await authApi.resendVerificationEmail(registeredEmail);
+
+      // 模拟API调用
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      toast.success('验证邮件已重新发送');
+    } catch (error) {
+      handleFormError(error as Error);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // 如果注册成功，显示邮箱验证提示
+  if (isRegistrationSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-400 to-blue-400 rounded-full mb-4">
+              <CheckCircle className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">注册成功！</h1>
+            <p className="text-gray-600">请验证您的邮箱地址</p>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/20">
+            <div className="text-center space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-center mb-2">
+                  <Mail className="w-6 h-6 text-blue-600 mr-2" />
+                  <span className="text-blue-800 font-medium">验证邮件已发送</span>
+                </div>
+                <p className="text-blue-700 text-sm">
+                  我们已将验证链接发送到：
+                </p>
+                <p className="text-blue-800 font-medium mt-1">{registeredEmail}</p>
+              </div>
+
+              <div className="text-sm text-gray-600 space-y-2">
+                <p>• 请检查您的邮箱（包括垃圾邮件文件夹）</p>
+                <p>• 点击邮件中的验证链接激活您的账户</p>
+                <p>• 验证链接将在24小时后过期</p>
+                <p>• 验证成功后即可登录使用所有功能</p>
+              </div>
+
+              <div className="space-y-3 pt-4">
+                <button
+                  onClick={handleResendEmail}
+                  disabled={isFormLoading}
+                  className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isFormLoading ? (
+                    <LoadingSpinner size="sm" text="重新发送中..." />
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      重新发送验证邮件
+                    </>
+                  )}
+                </button>
+
+                <Link
+                  to="/login"
+                  className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center"
+                >
+                  已验证？立即登录
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -135,11 +235,10 @@ const Register: React.FC = () => {
                   type="text"
                   value={formData.username}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
-                    validationErrors.username
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300 bg-white/50'
-                  }`}
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${validationErrors.username
+                    ? 'border-red-300 bg-red-50'
+                    : 'border-gray-300 bg-white/50'
+                    }`}
                   placeholder="请输入您的用户名"
                   disabled={isLoading}
                 />
@@ -164,11 +263,10 @@ const Register: React.FC = () => {
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
-                    validationErrors.email
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300 bg-white/50'
-                  }`}
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${validationErrors.email
+                    ? 'border-red-300 bg-red-50'
+                    : 'border-gray-300 bg-white/50'
+                    }`}
                   placeholder="请输入您的邮箱地址"
                   disabled={isLoading}
                 />
@@ -193,11 +291,10 @@ const Register: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
-                    validationErrors.password
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300 bg-white/50'
-                  }`}
+                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${validationErrors.password
+                    ? 'border-red-300 bg-red-50'
+                    : 'border-gray-300 bg-white/50'
+                    }`}
                   placeholder="请输入您的密码"
                   disabled={isLoading}
                 />
@@ -234,11 +331,10 @@ const Register: React.FC = () => {
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
-                    validationErrors.confirmPassword
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300 bg-white/50'
-                  }`}
+                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${validationErrors.confirmPassword
+                    ? 'border-red-300 bg-red-50'
+                    : 'border-gray-300 bg-white/50'
+                    }`}
                   placeholder="请再次输入您的密码"
                   disabled={isLoading}
                 />
