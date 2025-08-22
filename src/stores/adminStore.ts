@@ -217,4 +217,72 @@ export const adminApi = {
     
     return response.json();
   },
+
+  // 更新用户信息
+  updateUser: async (userId: number, userData: {
+    username: string;
+    email: string;
+    account?: string;
+    phone?: string;
+    role: string;
+    status: string;
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      method: 'PUT',
+      headers: adminApi.getAuthHeaders(),
+      body: JSON.stringify(userData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || '更新用户信息失败');
+    }
+    
+    return response.json();
+  },
+
+  // 删除用户
+  deleteUser: async (userId: number) => {
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: adminApi.getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || '删除用户失败');
+    }
+    
+    return response.json();
+  },
+
+  // 切换用户状态
+  updateUserStatus: async (userId: number, status: 'active' | 'inactive' | 'banned') => {
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/status`, {
+      method: 'PATCH',
+      headers: adminApi.getAuthHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || '更新用户状态失败');
+    }
+    
+    return response.json();
+  },
+
+  // 获取单个用户详情
+  getUser: async (userId: number) => {
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      headers: adminApi.getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || '获取用户详情失败');
+    }
+    
+    return response.json();
+  },
 };

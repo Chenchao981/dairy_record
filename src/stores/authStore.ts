@@ -268,7 +268,7 @@ export const useAuthStore = create<AuthState>()((set, get) => {
     refreshToken: async (): Promise<boolean> => {
       const authData = AuthPersistence.getAuthData();
 
-      if (!authData.refreshToken) {
+      if (!authData || !authData.refreshToken) {
         return false;
       }
 
@@ -315,7 +315,7 @@ export const useAuthStore = create<AuthState>()((set, get) => {
     checkAuth: async (): Promise<boolean> => {
       const authData = AuthPersistence.getAuthData();
 
-      if (!authData.token || authData.isExpired) {
+      if (!authData || !authData.token || authData.isExpired) {
         set({
           user: null,
           isAuthenticated: false,

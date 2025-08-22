@@ -38,6 +38,8 @@ export interface RegisterRequest {
 export interface AuthResponse {
   user: User;
   token: string;
+  refreshToken?: string;
+  expiresIn?: number;
 }
 
 // HTTP请求工具函数
@@ -137,34 +139,34 @@ export const authApi = {
   // 用户注册
   register: async (data: RegisterRequest): Promise<ApiResponse<AuthResponse>> => {
     const response = await apiClient.post<AuthResponse>('/auth/register', data);
-    
+
     // 注册成功后自动设置token
     if (response.success && response.data?.token) {
       apiClient.setToken(response.data.token);
     }
-    
+
     return response;
   },
 
   // 用户登录
   login: async (data: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
-    
+
     // 登录成功后自动设置token
     if (response.success && response.data?.token) {
       apiClient.setToken(response.data.token);
     }
-    
+
     return response;
   },
 
   // 用户注销
   logout: async (): Promise<ApiResponse> => {
     const response = await apiClient.post('/auth/logout');
-    
+
     // 注销后清除token
     apiClient.setToken(null);
-    
+
     return response;
   },
 
@@ -199,8 +201,11 @@ export const getStoredToken = (): string | null => {
 
 // 工具函数：清除认证信息
 export const clearAuth = (): void => {
-  localStorage.removeItem('auth_token');
   apiClient.setToken(null);
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user_data');
+  sessionStorage.removeItem('auth_token');
+  sessionStorage.removeItem('user_data');
 };
 
 // 情绪记录相关接口
@@ -235,10 +240,10 @@ export const emotionApi = {
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/emotions?${queryString}` : '/emotions';
-    
+
     return apiClient.get<{ records: EmotionRecord[]; total: number }>(endpoint);
   },
 
@@ -262,10 +267,10 @@ export const emotionApi = {
     const queryParams = new URLSearchParams();
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/emotions/stats?${queryString}` : '/emotions/stats';
-    
+
     return apiClient.get(endpoint);
   },
 };

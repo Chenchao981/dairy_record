@@ -6,18 +6,22 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import EmailVerification from "@/pages/EmailVerification";
 import EmotionRecord from "@/pages/EmotionRecord";
-import EmotionHistory from "@/pages/EmotionHistory";
-import EmotionAnalysis from "@/pages/EmotionAnalysis";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminLayout from "@/components/admin/AdminLayout";
-import AdminDashboard from "@/pages/admin/AdminDashboard";
-import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminAnalytics from "@/pages/admin/AdminAnalytics";
-import AdminSettings from "@/pages/admin/AdminSettings";
 import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import { UserGuard, AdminGuard } from "@/components/RouteGuard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Toaster } from 'sonner';
+
+// 懒加载组件（大型页面）
+import {
+  LazyEmotionHistory,
+  LazyEmotionAnalysis,
+  LazyAdminDashboard,
+  LazyAdminUsers,
+  LazyAdminSettings
+} from "@/utils/lazyLoad";
 
 export default function App() {
   return (
@@ -38,12 +42,12 @@ export default function App() {
           } />
           <Route path="/history" element={
             <UserGuard>
-              <EmotionHistory />
+              <LazyEmotionHistory />
             </UserGuard>
           } />
           <Route path="/analysis" element={
             <UserGuard>
-              <EmotionAnalysis />
+              <LazyEmotionAnalysis />
             </UserGuard>
           } />
 
@@ -56,11 +60,11 @@ export default function App() {
               <AdminLayout />
             </ProtectedAdminRoute>
           }>
-            <Route index element={<AdminDashboard />} />
-            <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="users" element={<AdminUsers />} />
+            <Route index element={<LazyAdminDashboard />} />
+            <Route path="dashboard" element={<LazyAdminDashboard />} />
+            <Route path="users" element={<LazyAdminUsers />} />
             <Route path="analytics" element={<AdminAnalytics />} />
-            <Route path="settings" element={<AdminSettings />} />
+            <Route path="settings" element={<LazyAdminSettings />} />
           </Route>
         </Routes>
         {/* 全局通知 */}

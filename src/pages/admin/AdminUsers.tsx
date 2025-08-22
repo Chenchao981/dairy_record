@@ -50,7 +50,7 @@ interface UsersResponse {
 }
 
 const AdminUsers: React.FC = () => {
-  const { handleError, handleNetworkError } = useErrorHandler();
+  const { handleError, handleNetworkError, handleFormError } = useErrorHandler();
   const { isPageLoading, setPageLoading } = usePageLoading('admin-users');
 
   const [users, setUsers] = useState<User[]>([]);
@@ -150,32 +150,39 @@ const AdminUsers: React.FC = () => {
     if (!editingUser) return;
 
     try {
-      // 这里需要实现API调用来更新用户
-      // const response = await adminApi.updateUser(editingUser.id, editForm);
-
-      // 模拟更新成功
-      toast.success('用户信息更新成功');
-      setShowEditModal(false);
-      fetchUsers(); // 重新加载用户列表
-    } catch (error) {
-      toast.error('更新用户信息失败');
+      const response = await adminApi.updateUser(editingUser.id, editForm);
+      
+      if (response.success) {
+        toast.success('用户信息更新成功');
+        setShowEditModal(false);
+        fetchUsers(); // 重新加载用户列表
+      } else {
+        throw new Error(response.message || '更新失败');
+      }
+    } catch (error: any) {
+      handleFormError(error, {
+        username: '用户名格式不正确',
+        email: '邮箱格式不正确或已被使用',
+      });
       console.error('Update user failed:', error);
     }
   };
 
   const handleToggleUserStatus = async (user: User, newStatus: 'active' | 'banned') => {
     try {
-      // 这里需要实现API调用来更新用户状态
-      // const response = await adminApi.updateUserStatus(user.id, newStatus);
-
-      // 模拟更新成功
+      const response = await adminApi.updateUserStatus(user.id, newStatus);
+      
+      if (response.success) {
+        const statusText = newStatus === 'active' ? '启用' : '禁用';
+        toast.success(`用户${statusText}成功`);
+        setDropdownOpen(null);
+        fetchUsers(); // 重新加载用户列表
+      } else {
+        throw new Error(response.message || '状态更新失败');
+      }
+    } catch (error: any) {
       const statusText = newStatus === 'active' ? '启用' : '禁用';
-      toast.success(`用户${statusText}成功`);
-      setDropdownOpen(null);
-      fetchUsers(); // 重新加载用户列表
-    } catch (error) {
-      const statusText = newStatus === 'active' ? '启用' : '禁用';
-      toast.error(`${statusText}用户失败`);
+      handleNetworkError(error);
       console.error('Toggle user status failed:', error);
     }
   };
@@ -186,15 +193,17 @@ const AdminUsers: React.FC = () => {
     }
 
     try {
-      // 这里需要实现API调用来删除用户
-      // const response = await adminApi.deleteUser(user.id);
-
-      // 模拟删除成功
-      toast.success('用户删除成功');
-      setDropdownOpen(null);
-      fetchUsers(); // 重新加载用户列表
-    } catch (error) {
-      toast.error('删除用户失败');
+      const response = await adminApi.deleteUser(user.id);
+      
+      if (response.success) {
+        toast.success('用户删除成功');
+        setDropdownOpen(null);
+        fetchUsers(); // 重新加载用户列表
+      } else {
+        throw new Error(response.message || '删除失败');
+      }
+    } catch (error: any) {
+      handleNetworkError(error);
       console.error('Delete user failed:', error);
     }
   };

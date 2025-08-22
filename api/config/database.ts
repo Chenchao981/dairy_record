@@ -61,7 +61,10 @@ const createTables = async () => {
       password TEXT NOT NULL,
       username TEXT NOT NULL,
       role TEXT DEFAULT 'user',
+      status TEXT DEFAULT 'active',
+      is_active BOOLEAN DEFAULT 1,
       avatar_url TEXT,
+      last_login DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -104,6 +107,9 @@ const createTables = async () => {
     db.run(createAdminsTable);
     db.run(createEmotionsTable);
     
+    // 数据库迁移：为现有用户表添加新字段
+    await migrateDatabase();
+    
     // 创建默认管理员账户（如果不存在）
     await createDefaultAdmin();
     
@@ -117,6 +123,40 @@ const createTables = async () => {
   } catch (error) {
     console.error('创建数据表失败:', error);
     throw error;
+  }
+};
+
+// 数据库迁移函数
+const migrateDatabase = async () => {
+  if (!db) return;
+  
+  try {
+    // 检查用户表是否缺少status字段
+    const tableInfo = db.exec("PRAGMA table_info(users)");
+    const columns = tableInfo[0]?.values?.map((row: any) => row[1]) || [];
+    
+    // 添加status字段
+    if (!columns.includes('status')) {
+      db.run('ALTER TABLE users ADD COLUMN status TEXT DEFAULT "active"');
+      console.log('已添加status字段到users表');
+    }
+    
+    // 添加is_active字段
+    if (!columns.includes('is_active')) {
+      db.run('ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT 1');
+      console.log('已添加is_active字段到users表');
+    }
+    
+    // 添加last_login字段
+    if (!columns.includes('last_login')) {
+      db.run('ALTER TABLE users ADD COLUMN last_login DATETIME');
+      console.log('已添加last_login字段到users表');
+    }
+    
+    saveDatabase();
+  } catch (error) {
+    console.error('数据库迁移失败:', error);
+    // 不抛出错误，让创建表的逻辑继续执行
   }
 };
 

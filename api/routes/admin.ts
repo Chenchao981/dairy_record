@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { AdminModel, AdminLoginData } from '../models/Admin.js';
-import { query, queryAll } from '../config/database.js';
+import { query, queryAll, run } from '../config/database.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -169,17 +169,41 @@ router.get('/users', verifyAdminToken, async (req: any, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
+    const search = req.query.search as string;
+    const status = req.query.status as string;
+    
+    // 构建查询条件
+    let whereClause = 'WHERE 1=1';
+    const queryParams: any[] = [];
+    
+    if (search) {
+      whereClause += ' AND (username LIKE ? OR email LIKE ?)';
+      queryParams.push(`%${search}%`, `%${search}%`);
+    }
+    
+    if (status && status !== 'all') {
+      if (status === 'active') {
+        whereClause += ' AND (status = "active" OR is_active = 1)';
+      } else if (status === 'inactive') {
+        whereClause += ' AND (status = "inactive" OR is_active = 0)';
+      } else if (status === 'banned') {
+        whereClause += ' AND status = "banned"';
+      }
+    }
     
     // 获取用户列表
     const users = queryAll(`
-      SELECT id, username, email, created_at 
+      SELECT 
+        id, username, email, account, phone, role, status, is_active, 
+        last_login, created_at, updated_at
       FROM users 
+      ${whereClause}
       ORDER BY created_at DESC 
       LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    `, [...queryParams, limit, offset]);
     
     // 获取用户总数
-    const totalCount = query('SELECT COUNT(*) as count FROM users');
+    const totalCount = query(`SELECT COUNT(*) as count FROM users ${whereClause}`, queryParams);
     
     res.json({
       success: true,
@@ -399,6 +423,172 @@ router.get('/dashboard/overview', verifyAdminToken, async (req: any, res) => {
     });
   } catch (error) {
     console.error('获取系统概览失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+});
+
+// 更新用户信息
+router.put('/users/:id', verifyAdminToken, async (req: any, res) => {
+  try {
+    const userId = req.params.id;
+    const { username, email, account, phone, role, status } = req.body;
+    
+    // 验证必填字段
+    if (!username || !email) {
+      return res.status(400).json({
+        success: false,
+        message: '用户名和邮箱不能为空'
+      });
+    }
+    
+    // 检查邮箱是否已被其他用户使用
+    const existingUser = query(
+      'SELECT id FROM users WHERE email = ? AND id != ?', 
+      [email, userId]
+    );
+    
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: '该邮箱已被其他用户使用'
+      });
+    }
+    
+    // 更新用户信息
+    const result = run(`
+      UPDATE users 
+      SET username = ?, email = ?, account = ?, phone = ?, role = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [username, email, account || null, phone || null, role || 'user', status || 'active', userId]);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: '用户信息更新成功'
+    });
+  } catch (error) {
+    console.error('更新用户信息失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+});
+
+// 删除用户
+router.delete('/users/:id', verifyAdminToken, async (req: any, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // 先删除用户的情绪记录
+    run('DELETE FROM emotions WHERE user_id = ?', [userId]);
+    
+    // 删除用户
+    const result = run('DELETE FROM users WHERE id = ?', [userId]);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: '用户删除成功'
+    });
+  } catch (error) {
+    console.error('删除用户失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+});
+
+// 切换用户状态
+router.patch('/users/:id/status', verifyAdminToken, async (req: any, res) => {
+  try {
+    const userId = req.params.id;
+    const { status } = req.body;
+    
+    if (!status || !['active', 'inactive', 'banned'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的用户状态'
+      });
+    }
+    
+    const result = run(
+      'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [status, userId]
+    );
+    
+    if (result.changes === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: `用户状态已更新为${status === 'active' ? '正常' : status === 'banned' ? '已禁用' : '非活跃'}`
+    });
+  } catch (error) {
+    console.error('更新用户状态失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+});
+
+// 获取单个用户详情
+router.get('/users/:id', verifyAdminToken, async (req: any, res) => {
+  try {
+    const userId = req.params.id;
+    
+    const user = query(`
+      SELECT 
+        id, username, email, account, phone, role, status, 
+        created_at, updated_at, last_login
+      FROM users 
+      WHERE id = ?
+    `, [userId]);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+    
+    // 获取用户的情绪记录统计
+    const emotionStats = query(`
+      SELECT COUNT(*) as total_emotions
+      FROM emotions
+      WHERE user_id = ?
+    `, [userId]);
+    
+    res.json({
+      success: true,
+      data: {
+        ...user,
+        emotion_count: emotionStats?.total_emotions || 0
+      }
+    });
+  } catch (error) {
+    console.error('获取用户详情失败:', error);
     res.status(500).json({
       success: false,
       message: '服务器内部错误'
